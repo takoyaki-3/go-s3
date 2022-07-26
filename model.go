@@ -3,13 +3,15 @@ package gos3
 import (
 	"io/ioutil"
 	"os"
+	"sync"
+	"time"
 
-	json "github.com/takoyaki-3/go-json"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	json "github.com/takoyaki-3/go-json"
 )
 
 type Config struct {
@@ -75,4 +77,52 @@ func (s *Session)UploadFromPath(targetFilePath string, objectKey string)error{
 		Body:   file,
 	})
 	return err
+}
+
+type ObjectProperty struct {
+	Size int64
+	Key string
+	LastModified string
+}
+
+func (s *Session)GetObjectList(prefix string)(objProps []ObjectProperty,err error){
+
+	s3Client := s3.New(s.Session)
+
+	params := &s3.ListObjectsV2Input{Bucket: &s.config.BucketName, Prefix: &prefix}
+	jst, _ := time.LoadLocation("Asia/Tokyo")
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	s3Client.ListObjectsV2Pages(params,
+		func(page *s3.ListObjectsV2Output, lastPage bool) bool {
+			defer wg.Done()
+			for _, obj := range page.Contents {
+				objProps = append(objProps, ObjectProperty{
+					Size: *obj.Size,
+					Key: *obj.Key,
+					LastModified: obj.LastModified.In(jst).Format("2006-01-02 15:04:05"),
+				})
+			}
+			return *page.IsTruncated
+		})
+
+	wg.Wait()
+	return objProps,err
+}
+
+func (s *Session)DeleteObject(key string)(err error){
+	
+	s3Client := s3.New(s.Session)
+
+	_, err = s3Client.DeleteObject(&s3.DeleteObjectInput{Bucket: &s.config.BucketName, Key: &key})
+	if err != nil {
+		return err
+	}
+
+	return s3Client.WaitUntilObjectNotExists(&s3.HeadObjectInput{
+		Bucket: &s.config.BucketName,
+		Key:    &key,
+	})
 }
