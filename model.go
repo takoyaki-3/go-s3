@@ -1,6 +1,7 @@
 package gos3
 
 import (
+	"io"
 	"io/ioutil"
 	"os"
 	"sync"
@@ -42,8 +43,7 @@ func NewSession(configFilePath string)(s Session, err error){
 	return s,nil
 }
 
-func (s *Session)DownloadToRaw(objectKey string, raw *[]byte)error{
-
+func (s *Session)DownloadToReaderFunc(objectKey string, f func(w io.Reader)error)error{
 	s3Client := s3.New(s.Session)
 
 	// Get Object
@@ -55,11 +55,27 @@ func (s *Session)DownloadToRaw(objectKey string, raw *[]byte)error{
 	resp := obj.Body
 	defer resp.Close()
 
-	b, err := ioutil.ReadAll(resp)
-	if err != nil {
-		return err
-	}
-	*raw = append([]byte{}, b...)
+	return f(resp)
+}
+
+func (s *Session)DownloadToRaw(objectKey string, raw *[]byte)error{
+	return s.DownloadToReaderFunc(objectKey,func(r io.Reader) error {
+		b, err := ioutil.ReadAll(r)
+		if err != nil {
+			return err
+		}
+		*raw = append([]byte{}, b...)
+		return err	
+	})
+}
+
+func (s *Session)UploadFromReader(r io.Reader, objectKey string)error{
+	uploader := s3manager.NewUploader(s.Session)
+	_, err := uploader.Upload(&s3manager.UploadInput{
+		Bucket: aws.String(s.config.BucketName),
+		Key:    aws.String(objectKey),
+		Body:   r,
+	})
 	return err
 }
 
@@ -70,13 +86,7 @@ func (s *Session)UploadFromPath(targetFilePath string, objectKey string)error{
 	}
 	defer file.Close()
 
-	uploader := s3manager.NewUploader(s.Session)
-	_, err = uploader.Upload(&s3manager.UploadInput{
-		Bucket: aws.String(s.config.BucketName),
-		Key:    aws.String(objectKey),
-		Body:   file,
-	})
-	return err
+	return s.UploadFromReader(file,objectKey)
 }
 
 type ObjectProperty struct {
