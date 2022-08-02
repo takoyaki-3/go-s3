@@ -103,12 +103,12 @@ func (s *Session)GetObjectList(prefix string)(objProps []ObjectProperty,err erro
 	params := &s3.ListObjectsV2Input{Bucket: &s.config.BucketName, Prefix: &prefix}
 	jst, _ := time.LoadLocation("Asia/Tokyo")
 
-	wg := sync.WaitGroup{}
-	wg.Add(1)
+	// wg := sync.WaitGroup{}
+	// wg.Add(1)
 
 	s3Client.ListObjectsV2Pages(params,
 		func(page *s3.ListObjectsV2Output, lastPage bool) bool {
-			defer wg.Done()
+			// defer wg.Done()
 			for _, obj := range page.Contents {
 				objProps = append(objProps, ObjectProperty{
 					Size: *obj.Size,
@@ -119,7 +119,7 @@ func (s *Session)GetObjectList(prefix string)(objProps []ObjectProperty,err erro
 			return *page.IsTruncated
 		})
 
-	wg.Wait()
+	// wg.Wait()
 	return objProps,err
 }
 
