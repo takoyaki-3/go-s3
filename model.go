@@ -71,6 +71,7 @@ func (s *Session)DownloadToRaw(objectKey string, raw *[]byte)error{
 
 func (s *Session)UploadFromReader(r io.Reader, objectKey string)error{
 	uploader := s3manager.NewUploader(s.Session)
+	uploader.PartSize = 5 * 1024 * 1024 * 1024
 	_, err := uploader.Upload(&s3manager.UploadInput{
 		Bucket: aws.String(s.config.BucketName),
 		Key:    aws.String(objectKey),
