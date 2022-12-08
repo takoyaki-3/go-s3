@@ -1,11 +1,11 @@
 package gos3
 
 import (
+	"bytes"
 	"io"
 	"io/ioutil"
 	"os"
 	"time"
-	"bytes"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -16,38 +16,38 @@ import (
 )
 
 type Config struct {
-	AccessKey string `json:"access_key"`
-	SecretKey string `json:"secret_key"`
-	Region string `json:"region"`
+	AccessKey  string `json:"access_key"`
+	SecretKey  string `json:"secret_key"`
+	Region     string `json:"region"`
 	BucketName string `json:"bucket_name"`
-	EndPoint string `json:"endpoint"`
+	EndPoint   string `json:"endpoint"`
 }
 
 type Session struct {
-	// 
+	//
 	Session *session.Session
-	config Config
+	config  Config
 }
 
-func NewSession(configFilePath string)(s Session, err error){
-	if err:=json.LoadFromPath(configFilePath,&s.config);err!=nil{
-		return s,err
+func NewSession(configFilePath string) (s Session, err error) {
+	if err := json.LoadFromPath(configFilePath, &s.config); err != nil {
+		return s, err
 	}
 	s.Session = session.Must(session.NewSession(&aws.Config{
-		Region:      aws.String(s.config.Region),
+		Region: aws.String(s.config.Region),
 		Credentials: credentials.NewStaticCredentials(
 			s.config.AccessKey, s.config.SecretKey, "",
 		),
 		Endpoint: aws.String(s.config.EndPoint),
 	}))
-	return s,nil
+	return s, nil
 }
 
-func (s *Session)DownloadToReaderFunc(objectKey string, f func(w io.Reader)error)error{
+func (s *Session) DownloadToReaderFunc(objectKey string, f func(w io.Reader) error) error {
 	s3Client := s3.New(s.Session)
 
 	// Get Object
-	obj, err := s3Client.GetObject(&s3.GetObjectInput{ Bucket: aws.String(s.config.BucketName), Key: aws.String(objectKey), })
+	obj, err := s3Client.GetObject(&s3.GetObjectInput{Bucket: aws.String(s.config.BucketName), Key: aws.String(objectKey)})
 	if err != nil {
 		return err
 	}
@@ -58,18 +58,18 @@ func (s *Session)DownloadToReaderFunc(objectKey string, f func(w io.Reader)error
 	return f(resp)
 }
 
-func (s *Session)DownloadToRaw(objectKey string, raw *[]byte)error{
-	return s.DownloadToReaderFunc(objectKey,func(r io.Reader) error {
+func (s *Session) DownloadToRaw(objectKey string, raw *[]byte) error {
+	return s.DownloadToReaderFunc(objectKey, func(r io.Reader) error {
 		b, err := ioutil.ReadAll(r)
 		if err != nil {
 			return err
 		}
 		*raw = append([]byte{}, b...)
-		return err	
+		return err
 	})
 }
 
-func (s *Session)UploadFromReader(r io.Reader, objectKey string)error{
+func (s *Session) UploadFromReader(r io.Reader, objectKey string) error {
 	uploader := s3manager.NewUploader(s.Session)
 	uploader.PartSize = 5 * 1024 * 1024 * 1024
 	_, err := uploader.Upload(&s3manager.UploadInput{
@@ -80,28 +80,28 @@ func (s *Session)UploadFromReader(r io.Reader, objectKey string)error{
 	return err
 }
 
-func (s *Session)UploadFromPath(targetFilePath string, objectKey string)error{
+func (s *Session) UploadFromPath(targetFilePath string, objectKey string) error {
 	file, err := os.Open(targetFilePath)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
-	return s.UploadFromReader(file,objectKey)
+	return s.UploadFromReader(file, objectKey)
 }
 
-func (s *Session)UploadFromRaw(raw []byte, objectKey string)error{
+func (s *Session) UploadFromRaw(raw []byte, objectKey string) error {
 	r := bytes.NewReader(raw)
-	return s.UploadFromReader(r,objectKey)
+	return s.UploadFromReader(r, objectKey)
 }
 
 type ObjectProperty struct {
-	Size int64
-	Key string
+	Size         int64
+	Key          string
 	LastModified string
 }
 
-func (s *Session)GetObjectList(prefix string)(objProps []ObjectProperty,err error){
+func (s *Session) GetObjectList(prefix string) (objProps []ObjectProperty, err error) {
 
 	s3Client := s3.New(s.Session)
 
@@ -116,8 +116,8 @@ func (s *Session)GetObjectList(prefix string)(objProps []ObjectProperty,err erro
 			// defer wg.Done()
 			for _, obj := range page.Contents {
 				objProps = append(objProps, ObjectProperty{
-					Size: *obj.Size,
-					Key: *obj.Key,
+					Size:         *obj.Size,
+					Key:          *obj.Key,
 					LastModified: obj.LastModified.In(jst).Format("2006-01-02 15:04:05"),
 				})
 			}
@@ -125,11 +125,11 @@ func (s *Session)GetObjectList(prefix string)(objProps []ObjectProperty,err erro
 		})
 
 	// wg.Wait()
-	return objProps,err
+	return objProps, err
 }
 
-func (s *Session)DeleteObject(key string)(err error){
-	
+func (s *Session) DeleteObject(key string) (err error) {
+
 	s3Client := s3.New(s.Session)
 
 	_, err = s3Client.DeleteObject(&s3.DeleteObjectInput{Bucket: &s.config.BucketName, Key: &key})
