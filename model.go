@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"time"
+	"bytes"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -87,6 +88,11 @@ func (s *Session)UploadFromPath(targetFilePath string, objectKey string)error{
 	defer file.Close()
 
 	return s.UploadFromReader(file,objectKey)
+}
+
+func (s *Session)UploadFromRaw(raw []byte, objectKey string)error{
+	r := bytes.NewReader(raw)
+	return s.UploadFromReader(r,objectKey)
 }
 
 type ObjectProperty struct {
