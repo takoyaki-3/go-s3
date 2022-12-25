@@ -69,6 +69,18 @@ func (s *Session) DownloadToRaw(objectKey string, raw *[]byte) error {
 	})
 }
 
+func (s *Session) DownloadToPath(objectKey string, filePath string)error{
+	return s.DownloadToReaderFunc(objectKey,func(r io.Reader) error {
+		w, err := os.Create(filePath)
+		if err != nil{
+			return err
+		}
+		defer w.Close()
+		_,err = io.Copy(w,r)
+		return err
+	})
+}
+
 func (s *Session) UploadFromReader(r io.Reader, objectKey string) error {
 	uploader := s3manager.NewUploader(s.Session)
 	uploader.PartSize = 5 * 1024 * 1024 * 1024
